@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# bdeploy config file
+#
+# The $HISTORY variable sets how many versions to keep.
+# Set it to 0 to keep all version.
+#
+# The $DB_TYPE variable can be set to either "mysql"
+# or "pgsql". If it is "pgsql" you will be asked for the
+# password via a prompt, since sending it via CLI isn't
+# allowed with the PostgreSQL database.
+#
+# Typically, you can leave the following variables blank,
+# as they will be auto-populated based on the current user
+# and the location of the project. You can fill them in
+# for special cases for when you need to override the
+# default settings
+#
+# $TEST_SERVER
+# $TEST_DEST
+# $TEST_USER
+# $LIVE_USER
+#
+# For the default settings to work, it requires SSH keys to
+# be properly configured to facilitate connecting to and
+# transferring to and from the servers
+#
+
+#
+# Global Config
+#
+HISTORY=0
+DB_TYPE="mysql"
+
+#
+# Test Environment
+#
+TEST_SERVER=
+TEST_DEST=
+TEST_USER=
+TEST_DB="testdb_staging"
+TEST_DBHOST="localhost"
+TEST_DBUSER="dbuser"
+TEST_DBPASS="12db34"
+
+#
+# Live Environment
+#
+LIVE_SERVER="www.liveserver.com"
+LIVE_DEST="/var/www/vhosts/path/to/your/site"
+LIVE_USER=
+LIVE_DB="testdb_live"
+LIVE_DBHOST="localhost"
+LIVE_DBUSER="dbuser"
+LIVE_DBPASS="12db34"

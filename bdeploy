@@ -1,0 +1,254 @@
+#!/bin/bash
+#
+# bdeploy
+# Version:     0.9 beta
+# Description: Bash-based Deployment Script
+# Author:      Nick Sagona
+# Copyright:   2012
+# License:     New BSD License
+#
+# Requires SSH keys to be properly configured to facilitate
+# connecting to and transferring to and from the servers
+#
+
+# Define some variables
+CURDIR="$(pwd)"
+CONF="$CURDIR/.bdconf"
+ACTION=
+FIRST=
+PREV=
+CURRENT=
+CURNUM=0
+PUSHDB=false
+HELP="\n
+
+A simple bash-based deployment script.\n\n
+
+USAGE: ./deploy -d\n\n
+
+-h, --help\t : Show this help screen.\n
+-c, --check\t : Check the date of the last deployment.\n
+-d, --deploy\t : Deploy the current project\n
+-i, --info\t : Information on the current configuration.\n
+-r, --rollback\t : Rollback the last deployment.\n
+-s, --setup\t : Set up the initial files and directories.\n
+
+"
+
+# Define some functions
+function get_current()
+{
+    DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST/releases")"
+    for D in $DIRS
+    do
+        if [ "$FIRST" = "" ]; then
+            FIRST="$D"
+        fi
+        CURRENT="$D"
+        let "CURNUM++"
+    done
+}
+
+function get_prev()
+{
+    get_current
+    DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST/releases")"
+    for D in $DIRS
+    do
+        if [ "$D" != "$CURRENT" ]; then
+            PREV="$D"
+        fi
+    done
+}
+
+# Check for and source the conf file
+if [ ! -f "$CONF" ]; then
+    echo -e "Could not file the .bdconf file.\n"
+    exit 0
+fi
+
+source $CONF
+
+# Parse arguments from the 'getopt' command
+TEMP=`getopt -o hcdirs --long help,check,deploy,info,rollback,setup \
+     -n 'Error' -- "$@"`
+
+while true ; do
+    case "$1" in
+        -h|--help) echo -e $HELP ; exit 1 ;;
+        -c|--check) ACTION="check" ; shift 1 ;;
+        -d|--deploy) ACTION="deploy" ; shift 1 ;;
+        -i|--info) ACTION="info" ; shift 1 ;;
+        -r|--rollback) ACTION="rollback" ; shift 1 ;;
+        -s|--setup) ACTION="setup" ; shift 1 ;;
+        *) break ;;
+    esac
+done
+
+# Set some defaults
+if [ "$TEST_SERVER" = "" ]; then
+    TEST_SERVER="localhost"
+fi
+if [ "$TEST_DEST" = "" ]; then
+    TEST_DEST="$CURDIR"
+fi
+if [ "$TEST_USER" = "" ]; then
+    TEST_USER="$(whoami)"
+fi
+if [ "$LIVE_USER" = "" ]; then
+    LIVE_USER="$(whoami)"
+fi
+
+if [ "$TEST_DB" != "" ] && [ "$TEST_DBHOST" != "" ] && [ "$TEST_DBUSER" != "" ] &&
+   [ "$LIVE_DB" != "" ] && [ "$LIVE_DBHOST" != "" ] && [ "$LIVE_DBUSER" != "" ]; then
+    PUSHDB=true
+fi
+
+if [ "$ACTION" = "deploy" ]; then
+    if [ ! -d "current" ]; then
+        echo -e "\nThere is nothing to deploy. This directory has not been set up yet.\n"
+    else
+        DIRS="$(ls ./releases)"
+        if [ "$DIRS" != "current" ]; then
+            get_current
+        fi
+
+        # Clean up the history
+        if [ "$HISTORY" -ne "0" ] && [ "$CURNUM" -eq "$HISTORY" ] && [ "$FIRST" != "" ] && [ -d "./releases/$FIRST" ]; then
+            rm -fdr "./releases/$FIRST"
+            ssh "$LIVE_USER@$LIVE_SERVER" rm -fdr "$LIVE_DEST/releases/$FIRST"
+        fi
+
+        echo -e "\nDeploying...\n"
+
+        TIME="$(date +%s)"
+        DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST")"
+        CHK=false
+
+        for D in $DIRS
+        do
+            if [ "$D" = "current" ]; then
+                CHK=true
+            fi
+        done
+
+        cp -rp "./releases/current" "./releases/$TIME"
+
+        # Dump the database
+        if $PUSHDB ; then
+            if [ "$DB_TYPE" = "pgsql" ]; then
+                echo -e "\nEnter the test environment PostgreSQL password:"
+                pg_dump -c -U "$TEST_DBUSER" --host="$TEST_DBHOST" "$TEST_DB" > "./releases/$TIME/db.sql"
+            elif [ "$DB_TYPE" = "mysql" ]; then
+                mysqldump -u "$TEST_DBUSER" --password="$TEST_DBPASS" --host="$TEST_DBHOST" "$TEST_DB" > "./releases/$TIME/db.sql"
+            fi
+        fi
+
+        tar -cvjpf "release-$TIME.tar.bz2" "./releases/$TIME"
+        scp "release-$TIME.tar.bz2" "$LIVE_USER@$LIVE_SERVER:$LIVE_DEST"
+        ssh "$LIVE_USER@$LIVE_SERVER" "tar -xvjpf $LIVE_DEST/release-$TIME.tar.bz2 -C $LIVE_DEST"
+
+        if $PUSHDB ; then
+            echo -e "\nMigrating the database..."
+            if [ "$DB_TYPE" = "pgsql" ]; then
+                echo -e "\nEnter the live environment PostgreSQL password:"
+                ssh -t "$LIVE_USER@$LIVE_SERVER" "psql -U $LIVE_DBUSER --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$TIME/db.sql"
+            elif [ "$DB_TYPE" = "mysql" ]; then
+                ssh "$LIVE_USER@$LIVE_SERVER" "mysql -u $LIVE_DBUSER --password=$LIVE_DBPASS --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$TIME/db.sql"
+            fi
+        fi
+
+        if $CHK ; then
+            ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/current"
+        fi
+
+        ssh "$LIVE_USER@$LIVE_SERVER" ln -s "$LIVE_DEST/releases/$TIME" "$LIVE_DEST/current"
+        rm -f "release-$TIME.tar.bz2"
+        ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/release-$TIME.tar.bz2"
+        echo -e "\nDone!\n"
+    fi
+elif [ "$ACTION" = "info" ]; then
+    echo -e "\nGlobal Settings:"
+    echo -e "----------------"
+    echo -e "History:       $HISTORY"
+    echo -e "Database Type: $DB_TYPE"
+
+    echo -e "\nCurrent Test Environment:"
+    echo -e "-------------------------"
+    echo -e "Server:        $TEST_SERVER"
+    echo -e "Destination:   $TEST_DEST"
+    echo -e "User:          $TEST_USER"
+    echo -e "Database:      $TEST_DB"
+    echo -e "DB Host:       $TEST_DBHOST"
+    echo -e "DB User:       $TEST_DBUSER"
+    echo -e "DB Password:   $TEST_DBPASS\n"
+
+    echo -e "Current Live Environment:"
+    echo -e "-------------------------"
+    echo -e "Server:        $LIVE_SERVER"
+    echo -e "Destination:   $LIVE_DEST"
+    echo -e "User:          $LIVE_USER"
+    echo -e "Database:      $LIVE_DB"
+    echo -e "DB Host:       $LIVE_DBHOST"
+    echo -e "DB User:       $LIVE_DBUSER"
+    echo -e "DB Password:   $LIVE_DBPASS\n"
+elif [ "$ACTION" = "rollback" ]; then
+    DIRS="$(ls ./releases)"
+    if [ ! -d "current" ]; then
+        echo -e "\nThere is nothing to roll back. This directory has not been set up yet.\n"
+    elif [ "$DIRS" = "current" ]; then
+        echo -e "\nThere is nothing to roll back. This application has not been deployed yet.\n"
+    else
+        get_prev
+        if [ "$PREV" != "" ]; then
+            echo -e "\nRolling back to the previous deployment..."
+            rm -fdr ./releases/current
+            rm -fdr "./releases/$CURRENT"
+            cp -rp "./releases/$PREV" ./releases/current
+
+            ssh "$LIVE_USER@$LIVE_SERVER" rm -fdr "$LIVE_DEST/releases/$CURRENT"
+            ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/current"
+            ssh "$LIVE_USER@$LIVE_SERVER" ln -s "$LIVE_DEST/releases/$PREV" "$LIVE_DEST/current"
+
+            if $PUSHDB ; then
+                echo -e "\nRestoring the database..."
+                if [ "$DB_TYPE" = "pgsql" ]; then
+                    echo -e "\nEnter the test environment PostgreSQL password:"
+                    psql -U "$TEST_DBUSER" "--host=$TEST_DBHOST" "$TEST_DB" < "./releases/$PREV/db.sql"
+                    echo -e "\nEnter the live environment PostgreSQL password:"
+                    ssh -t "$LIVE_USER@$LIVE_SERVER" "psql -U $LIVE_DBUSER --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$PREV/db.sql"
+                elif [ "$DB_TYPE" = "mysql" ]; then
+                    mysql -u "$TEST_DBUSER" "--password=$TEST_DBPASS" "--host=$TEST_DBHOST" "$TEST_DB" < "./releases/$PREV/db.sql"
+                    ssh "$LIVE_USER@$LIVE_SERVER" "mysql -u $LIVE_DBUSER --password=$LIVE_DBPASS --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$PREV/db.sql"
+                fi
+            fi
+
+            echo -e "\nDone!\n"
+        fi
+    fi
+elif [ "$ACTION" = "setup" ]; then
+    if [ ! -d "current" ]; then
+        echo -e "\nCreating local files and folders..."
+        mkdir ./releases
+        mkdir ./releases/current
+        ln -s ./releases/current current
+        echo -e "\nSetup complete\n"
+    else
+        echo -e "\nIt appears the initial files and directories have already been set up.\n"
+    fi
+elif [ "$ACTION" = "check" ]; then
+    if [ -d "current" ]; then
+        DIRS="$(ls ./releases)"
+        if [ "$DIRS" = "current" ]; then
+            echo -e "\nThis application has not been deployed yet.\n"
+        else
+            get_current
+            echo -e "\nLast Deployed: $(date --date="1970-01-01 $CURRENT sec GMT")\n"
+        fi
+    else
+        echo -e "\nThis application has not been set up or deployed yet.\n"
+    fi
+else
+    echo -e "\nPlease select an option. ./bdeploy -h for help.\n"
+    exit 0
+fi
