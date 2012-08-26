@@ -30,7 +30,7 @@ USAGE: ./deploy -d\n\n
 -c, --check\t : Check the date of the last deployment.\n
 -d, --deploy\t : Deploy the current project\n
 -i, --info\t : Information on the current configuration.\n
--r, --rollback\t : Rollback the last deployment.\n
+-r, --rollback\t : Rollback to the last deployment.\n
 -s, --setup\t : Set up the initial files and directories.\n
 
 "
