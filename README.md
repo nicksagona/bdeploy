@@ -3,7 +3,7 @@ bdeploy
 
 RELEASE INFORMATION
 -------------------
-bdeploy 0.9 Beta Release
+bdeploy 0.9 Beta Release  
 Released August 26, 2012
 
 OVERVIEW
@@ -14,21 +14,24 @@ servers to your live production servers.
 
 USAGE
 -----
-Just download the main bash script and the example .bdconf file. Place the .bdconf
-file in the main, top-level folder of your website or application. Edit the .bdconf
-file with the correct configuration and credentials necessary.
+bdeploy id currently for use on Linux or Unix environments only. It supports
+MySQL, PostgreSQL and, of course, SQLite databases. Just download the main
+bash script and the example .bdconf file. Place the .bdconf file in the main,
+top-level folder of your website or application. Edit the .bdconf file with
+the correct configuration and credentials necessary.
 
-From there, you simply need to set up the main folder
+From there, you simply need to set up the main folder by running:
 
 ./bdeploy -s
 
 add your files to the './current' directory and work on them there. When you are
-ready to deploy to the live server, simply run
+ready to deploy to the live server, just run:
 
 ./bdeploy -d
 
-and it'll do the work for you. It'll keep the different versions of your website
-or your application so you can always rollback to the previous version if you need to:
+and it'll do the work for you. It'll keep the previous versions of your website
+or your application as you go along, so you can always rollback to the previous
+version if you need to by running:
 
 ./bdeploy -r
 
