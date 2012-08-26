@@ -3,7 +3,7 @@
 # bdeploy config file
 #
 # The $HISTORY variable sets how many versions to keep.
-# Set it to 0 to keep all version.
+# Set it to 0 to keep all versions.
 #
 # The $DB_TYPE variable can be set to either "mysql"
 # or "pgsql". If it is "pgsql" you will be asked for the
@@ -23,7 +23,7 @@
 #
 # For the default settings to work, it requires SSH keys to
 # be properly configured to facilitate connecting to and
-# transferring to and from the servers
+# transferring to the servers
 #
 
 #
@@ -53,3 +53,4 @@ LIVE_DB="testdb_live"
 LIVE_DBHOST="localhost"
 LIVE_DBUSER="dbuser"
 LIVE_DBPASS="12db34"
+

@@ -8,7 +8,7 @@
 # License:     New BSD License https://raw.github.com/nicksagona/bdeploy/master/LICENSE.TXT
 #
 # Requires SSH keys to be properly configured to facilitate
-# connecting to and transferring to and from the servers
+# connecting to and transferring to the servers
 #
 
 # Define some variables
@@ -104,6 +104,7 @@ if [ "$TEST_DB" != "" ] && [ "$TEST_DBHOST" != "" ] && [ "$TEST_DBUSER" != "" ] 
     PUSHDB=true
 fi
 
+# Get to work
 if [ "$ACTION" = "deploy" ]; then
     if [ ! -d "current" ]; then
         echo -e "\nThere is nothing to deploy. This directory has not been set up yet.\n"

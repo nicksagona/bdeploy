@@ -14,7 +14,7 @@ servers to your live production servers.
 
 USAGE
 -----
-bdeploy id currently for use on Linux or Unix environments only. It supports
+bdeploy is currently for use on Linux or Unix environments only. It supports
 MySQL, PostgreSQL and, of course, SQLite databases. Just download the main
 bash script and the example .bdconf file. Place the .bdconf file in the main,
 top-level folder of your website or application. Edit the .bdconf file with
@@ -24,7 +24,7 @@ From there, you simply need to set up the main folder by running:
 
 ./bdeploy -s
 
-add your files to the './current' directory and work on them there. When you are
+Add your files to the './current' directory and work on them there. When you are
 ready to deploy to the live server, just run:
 
 ./bdeploy -d
