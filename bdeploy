@@ -5,7 +5,7 @@
 # Description: Bash-based Deployment Script
 # Author:      Nick Sagona
 # Copyright:   2012
-# License:     New BSD License
+# License:     New BSD License https://raw.github.com/nicksagona/bdeploy/master/LICENSE.TXT
 #
 # Requires SSH keys to be properly configured to facilitate
 # connecting to and transferring to and from the servers
