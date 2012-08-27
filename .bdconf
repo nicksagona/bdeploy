@@ -19,7 +19,12 @@
 # $TEST_SERVER
 # $TEST_DEST
 # $TEST_USER
+# $LIVE_SERVER
 # $LIVE_USER
+#
+# If you leave both servers blank, the assumption is
+# made that both your test and live locations are on the
+# current server, or localhost.
 #
 # For the default settings to work, it requires SSH keys to
 # be properly configured to facilitate connecting to and

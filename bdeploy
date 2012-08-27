@@ -11,7 +11,9 @@
 # connecting to and transferring to the servers
 #
 
+#
 # Define some variables
+#
 CURDIR="$(pwd)"
 CONF="$CURDIR/.bdconf"
 ACTION=
@@ -34,8 +36,41 @@ USAGE: ./deploy -d\n\n
 -s, --setup\t : Set up the initial files and directories.\n
 
 "
-
+#
 # Define some functions
+#
+# Function to set default values
+function set_defaults()
+{
+    # Set some defaults
+    if [ "$TEST_SERVER" = "" ]; then
+        TEST_SERVER="localhost"
+    fi
+
+    if [ "$TEST_DEST" = "" ]; then
+        TEST_DEST="$CURDIR"
+    fi
+
+    if [ "$TEST_USER" = "" ]; then
+        TEST_USER="$(whoami)"
+    fi
+
+    if [ "$LIVE_SERVER" = "" ]; then
+        LIVE_SERVER="localhost"
+    fi
+
+    if [ "$LIVE_USER" = "" ]; then
+        LIVE_USER="$(whoami)"
+    fi
+
+    # Check if a database is present
+    if [ "$TEST_DB" != "" ] && [ "$TEST_DBHOST" != "" ] && [ "$TEST_DBUSER" != "" ] &&
+       [ "$LIVE_DB" != "" ] && [ "$LIVE_DBHOST" != "" ] && [ "$LIVE_DBUSER" != "" ]; then
+        PUSHDB=true
+    fi
+}
+
+# Function to get the current release
 function get_current()
 {
     DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST/releases")"
@@ -49,6 +84,7 @@ function get_current()
     done
 }
 
+# Function to get the previous release
 function get_prev()
 {
     get_current
@@ -61,13 +97,15 @@ function get_prev()
     done
 }
 
-# Check for and source the conf file
+# Check for the conf file
 if [ ! -f "$CONF" ]; then
     echo -e "Could not file the .bdconf file.\n"
     exit 0
 fi
 
+# Source the conf file and set the defaults
 source $CONF
+set_defaults
 
 # Parse arguments from the 'getopt' command
 TEMP=`getopt -o hcdirs --long help,check,deploy,info,rollback,setup \
@@ -84,25 +122,6 @@ while true ; do
         *) break ;;
     esac
 done
-
-# Set some defaults
-if [ "$TEST_SERVER" = "" ]; then
-    TEST_SERVER="localhost"
-fi
-if [ "$TEST_DEST" = "" ]; then
-    TEST_DEST="$CURDIR"
-fi
-if [ "$TEST_USER" = "" ]; then
-    TEST_USER="$(whoami)"
-fi
-if [ "$LIVE_USER" = "" ]; then
-    LIVE_USER="$(whoami)"
-fi
-
-if [ "$TEST_DB" != "" ] && [ "$TEST_DBHOST" != "" ] && [ "$TEST_DBUSER" != "" ] &&
-   [ "$LIVE_DB" != "" ] && [ "$LIVE_DBHOST" != "" ] && [ "$LIVE_DBUSER" != "" ]; then
-    PUSHDB=true
-fi
 
 # Get to work
 if [ "$ACTION" = "deploy" ]; then
@@ -133,6 +152,7 @@ if [ "$ACTION" = "deploy" ]; then
             fi
         done
 
+        # Copy the current version to a time-stamped directory
         cp -rp "./releases/current" "./releases/$TIME"
 
         # Dump the database
@@ -145,10 +165,12 @@ if [ "$ACTION" = "deploy" ]; then
             fi
         fi
 
+        # Package up the current version and send it over to the live server
         tar -cvjpf "release-$TIME.tar.bz2" "./releases/$TIME"
         scp "release-$TIME.tar.bz2" "$LIVE_USER@$LIVE_SERVER:$LIVE_DEST"
         ssh "$LIVE_USER@$LIVE_SERVER" "tar -xvjpf $LIVE_DEST/release-$TIME.tar.bz2 -C $LIVE_DEST"
 
+        # Import the databse
         if $PUSHDB ; then
             echo -e "\nMigrating the database..."
             if [ "$DB_TYPE" = "pgsql" ]; then
@@ -159,13 +181,16 @@ if [ "$ACTION" = "deploy" ]; then
             fi
         fi
 
+        # Some clean up, remove current symlink and create new one on the live server
         if $CHK ; then
             ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/current"
         fi
-
         ssh "$LIVE_USER@$LIVE_SERVER" ln -s "$LIVE_DEST/releases/$TIME" "$LIVE_DEST/current"
+
+        # Remove temporary archives
         rm -f "release-$TIME.tar.bz2"
         ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/release-$TIME.tar.bz2"
+
         echo -e "\nDone!\n"
     fi
 elif [ "$ACTION" = "info" ]; then
@@ -203,14 +228,18 @@ elif [ "$ACTION" = "rollback" ]; then
         get_prev
         if [ "$PREV" != "" ]; then
             echo -e "\nRolling back to the previous deployment..."
+
+            # Remove current version and copy previous over on the test server
             rm -fdr ./releases/current
             rm -fdr "./releases/$CURRENT"
             cp -rp "./releases/$PREV" ./releases/current
 
+            # Remove current version and copy previous over on the live server
             ssh "$LIVE_USER@$LIVE_SERVER" rm -fdr "$LIVE_DEST/releases/$CURRENT"
             ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/current"
             ssh "$LIVE_USER@$LIVE_SERVER" ln -s "$LIVE_DEST/releases/$PREV" "$LIVE_DEST/current"
 
+            # Restore the previous database
             if $PUSHDB ; then
                 echo -e "\nRestoring the database..."
                 if [ "$DB_TYPE" = "pgsql" ]; then
