@@ -51,7 +51,7 @@ TEST_DBPASS="12db34"
 #
 # Live Environment
 #
-LIVE_SERVER="www.liveserver.com"
+LIVE_SERVER="www.yourliveserver.com"
 LIVE_DEST="/var/www/vhosts/path/to/your/site"
 LIVE_USER=
 LIVE_DB="db_live"

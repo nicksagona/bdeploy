@@ -22,6 +22,8 @@ PREV=
 CURRENT=
 CURNUM=0
 PUSHDB=false
+COMP="j"
+COMPEXT="bz2"
 HELP="\n
 
 A simple bash-based deployment script.\n\n
@@ -69,16 +71,33 @@ function set_defaults()
        [ "$LIVE_DB" != "" ] && [ "$LIVE_DBHOST" != "" ] && [ "$LIVE_DBUSER" != "" ]; then
         PUSHDB=true
     fi
+
+    if [ "$(which bzip2)" = "" ]; then
+        COMP="z"
+        COMPEXT="gz"
+    fi
+}
+
+# Function to run a command either on the
+# live, remote server or locally
+function run_cmd()
+{
+    if [ "$LIVE_SERVER" = "localhost" ]; then
+        eval "$1"
+    else
+        if [[ $1 == *psql* ]]; then
+            ssh -t "$LIVE_USER@$LIVE_SERVER" "$1"
+        else
+            ssh "$LIVE_USER@$LIVE_SERVER" "$1"
+        fi
+    fi
 }
 
 # Function to get the current release
 function get_current()
 {
-    if [ "$LIVE_SERVER" = "localhost" ]; then
-        DIRS="$(ls "$LIVE_DEST/releases")"
-    else
-        DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST/releases")"
-    fi
+    DIRS="$(run_cmd "ls $LIVE_DEST/releases")"
+
     for D in $DIRS
     do
         if [ "$FIRST" = "" ]; then
@@ -93,11 +112,7 @@ function get_current()
 function get_prev()
 {
     get_current
-    if [ "$LIVE_SERVER" = "localhost" ]; then
-        DIRS="$(ls "$LIVE_DEST/releases")"
-    else
-        DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST/releases")"
-    fi
+    DIRS="$(run_cmd "ls $LIVE_DEST/releases")"
 
     for D in $DIRS
     do
@@ -146,11 +161,7 @@ if [ "$ACTION" = "deploy" ]; then
         # Clean up the history
         if [ "$HISTORY" -ne "0" ] && [ "$CURNUM" -eq "$HISTORY" ] && [ "$FIRST" != "" ] && [ -d "./releases/$FIRST" ]; then
             rm -fdr "./releases/$FIRST"
-            if [ "$LIVE_SERVER" = "localhost" ]; then
-                rm -fdr "$LIVE_DEST/releases/$FIRST"
-            else
-                ssh "$LIVE_USER@$LIVE_SERVER" rm -fdr "$LIVE_DEST/releases/$FIRST"
-            fi
+            run_cmd "rm -fdr $LIVE_DEST/releases/$FIRST"
         fi
 
         echo -e "\nDeploying...\n"
@@ -158,11 +169,7 @@ if [ "$ACTION" = "deploy" ]; then
         TIME="$(date +%s)"
         CHK=false
 
-        if [ "$LIVE_SERVER" = "localhost" ]; then
-            DIRS="$(ls "$LIVE_DEST")"
-        else
-            DIRS="$(ssh "$LIVE_USER@$LIVE_SERVER" ls "$LIVE_DEST")"
-        fi
+        DIRS="$(run_cmd "ls $LIVE_DEST")"
 
         for D in $DIRS
         do
@@ -185,58 +192,37 @@ if [ "$ACTION" = "deploy" ]; then
         fi
 
         # Package up the current version and send it over to the live server
-        tar -cvjpf "release-$TIME.tar.bz2" "./releases/$TIME"
+        tar -cv"$COMP"pf "release-$TIME.tar.$COMPEXT" "./releases/$TIME"
 
         if [ "$LIVE_SERVER" = "localhost" ]; then
-            cp "release-$TIME.tar.bz2" "$LIVE_DEST"
-            tar -xvjpf "$LIVE_DEST/release-$TIME.tar.bz2" -C "$LIVE_DEST"
+            cp "release-$TIME.tar.$COMPEXT" "$LIVE_DEST"
         else
-            scp "release-$TIME.tar.bz2" "$LIVE_USER@$LIVE_SERVER:$LIVE_DEST"
-            ssh "$LIVE_USER@$LIVE_SERVER" "tar -xvjpf $LIVE_DEST/release-$TIME.tar.bz2 -C $LIVE_DEST"
+            scp "release-$TIME.tar.$COMPEXT" "$LIVE_USER@$LIVE_SERVER:$LIVE_DEST"
         fi
+
+        run_cmd "tar -xv"$COMP"pf $LIVE_DEST/release-$TIME.tar.$COMPEXT -C $LIVE_DEST"
 
         # Import the databse
         if $PUSHDB ; then
             echo -e "\nMigrating the database..."
             if [ "$DB_TYPE" = "pgsql" ]; then
                 echo -e "\nEnter the live environment PostgreSQL password:"
-                if [ "$LIVE_SERVER" = "localhost" ]; then
-                    psql -U "$LIVE_DBUSER" --host="$LIVE_DBHOST" "$LIVE_DB" < "$LIVE_DEST/releases/$TIME/db.sql"
-                else
-                    ssh -t "$LIVE_USER@$LIVE_SERVER" "psql -U $LIVE_DBUSER --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$TIME/db.sql"
-                fi
+                run_cmd "psql -U $LIVE_DBUSER --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$TIME/db.sql"
             elif [ "$DB_TYPE" = "mysql" ]; then
-                if [ "$LIVE_SERVER" = "localhost" ]; then
-                    mysql -u "$LIVE_DBUSER" --password="$LIVE_DBPASS" --host="$LIVE_DBHOST" "$LIVE_DB" < "$LIVE_DEST/releases/$TIME/db.sql"
-                else
-                    ssh "$LIVE_USER@$LIVE_SERVER" "mysql -u $LIVE_DBUSER --password=$LIVE_DBPASS --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$TIME/db.sql"
-                fi
+                run_cmd "mysql -u $LIVE_DBUSER --password=$LIVE_DBPASS --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$TIME/db.sql"
             fi
         fi
 
         # Some clean up, remove current symlink and create new one on the live server
         if $CHK ; then
-            if [ "$LIVE_SERVER" = "localhost" ]; then
-                rm -f "$LIVE_DEST/current"
-            else
-                ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/current"
-            fi
+            run_cmd "rm -f $LIVE_DEST/current"
         fi
 
-        if [ "$LIVE_SERVER" = "localhost" ]; then
-            ln -s "$LIVE_DEST/releases/$TIME" "$LIVE_DEST/current"
-        else
-            ssh "$LIVE_USER@$LIVE_SERVER" ln -s "$LIVE_DEST/releases/$TIME" "$LIVE_DEST/current"
-        fi
+        run_cmd "ln -s $LIVE_DEST/releases/$TIME $LIVE_DEST/current"
 
         # Remove temporary archives
-        rm -f "release-$TIME.tar.bz2"
-
-        if [ "$LIVE_SERVER" = "localhost" ]; then
-            rm -f "$LIVE_DEST/release-$TIME.tar.bz2"
-        else
-            ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/release-$TIME.tar.bz2"
-        fi
+        rm -f "release-$TIME.tar.$COMPEXT"
+        run_cmd "rm -f $LIVE_DEST/release-$TIME.tar.$COMPEXT"
 
         echo -e "\nDone!\n"
     fi
@@ -282,15 +268,9 @@ elif [ "$ACTION" = "rollback" ]; then
             cp -rp "./releases/$PREV" ./releases/current
 
             # Remove current version and copy previous over on the live server
-            if [ "$LIVE_SERVER" = "localhost" ]; then
-                rm -fdr "$LIVE_DEST/releases/$CURRENT"
-                rm -f "$LIVE_DEST/current"
-                ln -s "$LIVE_DEST/releases/$PREV" "$LIVE_DEST/current"
-            else
-                ssh "$LIVE_USER@$LIVE_SERVER" rm -fdr "$LIVE_DEST/releases/$CURRENT"
-                ssh "$LIVE_USER@$LIVE_SERVER" rm -f "$LIVE_DEST/current"
-                ssh "$LIVE_USER@$LIVE_SERVER" ln -s "$LIVE_DEST/releases/$PREV" "$LIVE_DEST/current"
-            fi
+            run_cmd "rm -fdr $LIVE_DEST/releases/$CURRENT"
+            run_cmd "rm -f $LIVE_DEST/current"
+            run_cmd "ln -s $LIVE_DEST/releases/$PREV $LIVE_DEST/current"
 
             # Restore the previous database
             if $PUSHDB ; then
@@ -299,18 +279,10 @@ elif [ "$ACTION" = "rollback" ]; then
                     echo -e "\nEnter the test environment PostgreSQL password:"
                     psql -U "$TEST_DBUSER" "--host=$TEST_DBHOST" "$TEST_DB" < "./releases/$PREV/db.sql"
                     echo -e "\nEnter the live environment PostgreSQL password:"
-                    if [ "$LIVE_SERVER" = "localhost" ]; then
-                        psql -U "$LIVE_DBUSER" --host="$LIVE_DBHOST" "$LIVE_DB" < "$LIVE_DEST/releases/$PREV/db.sql"
-                    else
-                        ssh -t "$LIVE_USER@$LIVE_SERVER" "psql -U $LIVE_DBUSER --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$PREV/db.sql"
-                    fi
+                    run_cmd "psql -U $LIVE_DBUSER --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$PREV/db.sql"
                 elif [ "$DB_TYPE" = "mysql" ]; then
                     mysql -u "$TEST_DBUSER" "--password=$TEST_DBPASS" "--host=$TEST_DBHOST" "$TEST_DB" < "./releases/$PREV/db.sql"
-                    if [ "$LIVE_SERVER" = "localhost" ]; then
-                        mysql -u "$LIVE_DBUSER" --password="$LIVE_DBPASS" --host="$LIVE_DBHOST" "$LIVE_DB" < "$LIVE_DEST/releases/$PREV/db.sql"
-                    else
-                        ssh "$LIVE_USER@$LIVE_SERVER" "mysql -u $LIVE_DBUSER --password=$LIVE_DBPASS --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$PREV/db.sql"
-                    fi
+                    run_cmd "mysql -u $LIVE_DBUSER --password=$LIVE_DBPASS --host=$LIVE_DBHOST $LIVE_DB < $LIVE_DEST/releases/$PREV/db.sql"
                 fi
             fi
 
