@@ -3,22 +3,28 @@ bdeploy
 
 RELEASE INFORMATION
 -------------------
-bdeploy 0.9 Beta Release  
-Released August 26, 2012
+bdeploy 1.0 Release
+Released August 28, 2012
 
 OVERVIEW
 --------
-bdeploy is a simple bash-based deployment script for websites and applications.
-With it, you can manage the deployment of files and databases from your test
-servers to your live production servers.
+bdeploy is a simple bash-based deployment script for the deployment of
+websites and applications. With it, you can manage the deployment of files
+and databases from your test server to your live production server.
 
 USAGE
 -----
-bdeploy is currently for use on Linux or Unix environments only. It supports
-MySQL, PostgreSQL and, of course, SQLite databases. Just download the main
-bash script and the example .bdconf file. Place the .bdconf file in the main,
-top-level folder of your website or application. Edit the .bdconf file with
-the correct configuration and credentials necessary.
+bdeploy is currently for use with the following setups:
+
+Test Environment     => Live Environment
+----------------------------------------
+Linux/Unix (w/ bash) => Linux/Unix (w/ bash)
+Windows (w/ cygwin)  => Linux/Unix (w/ bash)
+
+It supports MySQL, PostgreSQL and, of course, SQLite databases. Just download
+the main bash script and the example .bdconf file. Place the .bdconf file in
+the main, top-level folder of your website or application. Edit the .bdconf
+file with the correct configuration and credentials necessary.
 
 From there, you simply need to set up the main folder by running:
 
@@ -31,7 +37,7 @@ ready to deploy to the live server, just run:
 
 and it'll do the work for you. It'll keep the previous versions of your website
 or your application as you go along, so you can always rollback to the previous
-version if you need to by running:
+version by running:
 
 ./bdeploy -r
 

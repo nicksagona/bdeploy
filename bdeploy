@@ -1,14 +1,20 @@
 #!/bin/bash
 #
 # bdeploy
-# Version:     0.9 beta
+#
+# Version:     1.0
+# Released:    August 28, 2012
 # Description: Bash-based Deployment Script
 # Author:      Nick Sagona
 # Copyright:   2012
 # License:     New BSD License https://raw.github.com/nicksagona/bdeploy/master/LICENSE.TXT
 #
-# Requires SSH keys to be properly configured to facilitate
-# connecting to and transferring to the servers
+# Tested successfully on a standard Linux/Unix bash-based system
+# and a Windows cygwin-based system as well.
+#
+# Requires and assumes SSH public keys are properly configured
+# to facilitate connecting to and transferring to the servers
+# without passwords
 #
 
 #
@@ -129,7 +135,7 @@ if [ ! -f "$CONF" ]; then
 fi
 
 # Source the conf file and set the defaults
-source $CONF
+source "$CONF"
 set_defaults
 
 # Parse arguments from the 'getopt' command

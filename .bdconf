@@ -7,14 +7,14 @@
 #
 # The $DB_TYPE variable can be set to either "mysql"
 # or "pgsql". If it is "pgsql" you will be asked for the
-# password via a prompt, since sending it via CLI isn't
-# allowed with the PostgreSQL database.
+# password via a prompt, since sending the password via
+# CLI isn't allowed with the PostgreSQL database.
 #
 # Typically, you can leave the following variables blank,
 # as they will be auto-populated based on the current user
 # and the location of the project. You can fill them in
 # for special cases for when you need to override the
-# default settings
+# default settings:
 #
 # $TEST_SERVER
 # $TEST_DEST
@@ -23,12 +23,8 @@
 # $LIVE_USER
 #
 # If you leave both servers blank, the assumption is
-# made that both your test and live locations are on the
-# current server, or localhost.
-#
-# For the default settings to work, it requires SSH keys to
-# be properly configured to facilitate connecting to and
-# transferring to the servers
+# made that both your test and live environments are on
+# the current server, or localhost.
 #
 
 #
