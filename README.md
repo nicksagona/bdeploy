@@ -3,7 +3,7 @@ bdeploy
 
 RELEASE INFORMATION
 -------------------
-bdeploy 1.0 Release
+bdeploy 1.0 Release  
 Released August 28, 2012
 
 OVERVIEW
@@ -16,9 +16,8 @@ USAGE
 -----
 bdeploy is currently for use with the following setups:
 
-Test Environment     => Live Environment
-----------------------------------------
-Linux/Unix (w/ bash) => Linux/Unix (w/ bash)
+### Test Environment     => Live Environment ###
+Linux/Unix (w/ bash) => Linux/Unix (w/ bash)  
 Windows (w/ cygwin)  => Linux/Unix (w/ bash)
 
 It supports MySQL, PostgreSQL and, of course, SQLite databases. Just download
