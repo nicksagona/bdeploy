@@ -16,7 +16,7 @@ USAGE
 -----
 bdeploy is currently for use with the following setups:
 
-### Test Environment     => Live Environment ###
+#### Test Environment     => Live Environment ####
 Linux/Unix (w/ bash) => Linux/Unix (w/ bash)  
 Windows (w/ cygwin)  => Linux/Unix (w/ bash)
 
