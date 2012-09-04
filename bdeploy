@@ -34,7 +34,7 @@ HELP="\n
 
 A simple bash-based deployment script.\n\n
 
-USAGE: ./deploy -d\n\n
+USAGE: ./bdeploy -d\n\n
 
 -h, --help\t : Show this help screen.\n
 -c, --check\t : Check the date of the last deployment.\n
